@@ -11,8 +11,12 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-    <!-- Firebase Compat Libraries (Easier for single-file usage) -->
+    <!-- Firebase Compat Libraries -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -82,6 +86,19 @@
             background: rgba(0, 240, 255, 0.1);
         }
 
+        /* Tooltip Styling */
+        .tech-tooltip {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .group:hover .tech-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
         .nav-btn { position: relative; overflow: hidden; }
         .nav-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: rgba(0, 240, 255, 0.05); }
 
@@ -125,12 +142,11 @@
         // ==========================================
         // CONFIGURATION FLAG
         // ==========================================
-        const USE_FIREBASE = true; // Set to true to enable Firebase
+        const USE_FIREBASE = true; 
         
         // ==========================================
         // FIREBASE SETUP
         // ==========================================
-        // PASTE FIREBASE CONFIG HERE
         const firebaseConfig = {
            	apiKey: "AIzaSyBRODmPlfRCoh3s1uCqTutTftBNaFRfbJ4",
   		authDomain: "oee-tycoon-free.firebaseapp.com",
@@ -157,7 +173,7 @@
         }
 
         // ==========================================
-        // SOUND ENGINE (UNCHANGED)
+        // SOUND ENGINE
         // ==========================================
         const SoundFX = {
             ctx: null,
@@ -184,7 +200,7 @@
         };
 
         // ==========================================
-        // GAME DATA & LOGIC (UNCHANGED)
+        // GAME DATA & LOGIC
         // ==========================================
         const CASE = {
             budget: 50000,
@@ -196,30 +212,32 @@
         };
 
         const UPGRADES = [
-            { id: 'motor', cat: 'Availability', name: "Servo Motor Retrofit", cost: 18000, desc: "Reduces Breakdown Time by 75%", impact: { breakdown: 0.25 }, icon: 'ph-engine' },
-            { id: 'pdm', cat: 'Availability', name: "Vibration Sensors (PdM)", cost: 12000, desc: "Reduces Breakdown Time by 40%", impact: { breakdown: 0.6 }, icon: 'ph-wave-sine' },
-            { id: 'smed', cat: 'Availability', name: "SMED Blitz Consulting", cost: 5000, desc: "Reduces Setup Time by 50%", impact: { setup: 0.5 }, icon: 'ph-arrows-left-right' },
-            { id: 'spares', cat: 'Availability', name: "Spare Parts Kitting", cost: 4000, desc: "Reduces Breakdown Time by 10%", impact: { breakdown: 0.9 }, icon: 'ph-wrench' },
-            { id: 'auto_maint', cat: 'Availability', name: "Autonomous Maint.", cost: 8000, desc: "Reduces Breakdown 15%, Setup 10%", impact: { breakdown: 0.85, setup: 0.9 }, icon: 'ph-users-three' },
-            { id: 'thermal', cat: 'Availability', name: "Thermography Cam", cost: 6000, desc: "Reduces Breakdown by 12%", impact: { breakdown: 0.88 }, icon: 'ph-thermometer' },
-            { id: 'align', cat: 'Availability', name: "Laser Alignment", cost: 3000, desc: "Reduces Setup by 15%", impact: { setup: 0.85 }, icon: 'ph-crosshair' },
-            { id: 'quick_change', cat: 'Availability', name: "Quick-Change Tooling", cost: 15000, desc: "Reduces Setup by 70%", impact: { setup: 0.3 }, icon: 'ph-lightning' },
-            { id: 'guide', cat: 'Performance', name: "Low-Friction Guides", cost: 15000, desc: "Inc speed to 380 bpm", impact: { speed: 380 }, icon: 'ph-road-horizon' },
-            { id: 'dejam', cat: 'Performance', name: "Auto De-Jammer", cost: 8000, desc: "Removes 80% Micro-stops", impact: { stops: 0.2 }, icon: 'ph-robot' },
-            { id: 'buffer', cat: 'Performance', name: "Accumulation Buffer", cost: 20000, desc: "Reduces Micro-stop impact 50%", impact: { stops: 0.5 }, icon: 'ph-queue' },
-            { id: 'nozzles', cat: 'Performance', name: "High-Speed Nozzles", cost: 25000, desc: "Inc speed to 420 bpm", impact: { speed: 420 }, icon: 'ph-drop-half-bottom' },
-            { id: 'hmi', cat: 'Performance', name: "Digital HMI", cost: 6000, desc: "Reduces Stop duration 10%", impact: { stops: 0.9 }, icon: 'ph-monitor' },
-            { id: 'inverter', cat: 'Performance', name: "Inverter Drive", cost: 10000, desc: "Inc speed to 350 bpm", impact: { speed: 350 }, icon: 'ph-faders' },
-            { id: 'lubrication', cat: 'Performance', name: "Auto-Lubrication", cost: 4000, desc: "Smoother run, -10% stops", impact: { stops: 0.9 }, icon: 'ph-drop' },
-            { id: 'cobot', cat: 'Performance', name: "Packaging Cobot", cost: 22000, desc: "Inc speed to 400 bpm", impact: { speed: 400 }, icon: 'ph-android-logo' },
-            { id: 'vision', cat: 'Quality', name: "AI Vision System", cost: 14000, desc: "Reduces Reject Rate to 1%", impact: { rejects: 0.01 }, icon: 'ph-eye' },
-            { id: 'material', cat: 'Quality', name: "Premium Material", cost: 0, desc: "Rejects -50%, Margin -$0.05", impact: { rejects: 0.5 }, marginHit: 0.05, icon: 'ph-package' },
-            { id: 'poka', cat: 'Quality', name: "Poka-Yoke Fixtures", cost: 6000, desc: "Reduces Rejects by 30%", impact: { rejects: 0.7 }, icon: 'ph-shield-check' },
-            { id: 'weight', cat: 'Quality', name: "Inline Checkweigher", cost: 10000, desc: "Reduces Rejects by 20%", impact: { rejects: 0.8 }, icon: 'ph-scales' },
-            { id: 'temp', cat: 'Quality', name: "Temp Control Unit", cost: 4500, desc: "Reduces Rejects by 15%", impact: { rejects: 0.85 }, icon: 'ph-thermometer' },
-            { id: 'xray', cat: 'Quality', name: "X-Ray Inspection", cost: 18000, desc: "Reduces Rejects to 2%", impact: { rejects: 0.02 }, icon: 'ph-bone' },
-            { id: 'spc', cat: 'Quality', name: "SPC Software", cost: 5000, desc: "Reduces Rejects by 10%", impact: { rejects: 0.9 }, icon: 'ph-chart-line-up' },
-            { id: 'rejector', cat: 'Quality', name: "Auto-Rejector", cost: 7500, desc: "Prevents downstream scrap (-15%)", impact: { rejects: 0.85 }, icon: 'ph-trash' }
+            { id: 'motor', cat: 'Availability', name: "Servo Motor Retrofit", cost: 18000, desc: "Reduces Breakdown Time by 75%", impact: { breakdown: 0.25 }, icon: 'ph-engine', edu: "Replacing legacy induction motors with Servos provides precise control and feedback, drastically reducing mechanical stress and unplanned outages." },
+            { id: 'pdm', cat: 'Availability', name: "Vibration Sensors (PdM)", cost: 12000, desc: "Reduces Breakdown Time by 40%", impact: { breakdown: 0.6 }, icon: 'ph-wave-sine', edu: "Predictive Maintenance (PdM) uses IoT sensors to detect bearing wear before failure, allowing you to fix issues during planned downtime rather than emergencies." },
+            { id: 'smed', cat: 'Availability', name: "SMED Blitz Consulting", cost: 5000, desc: "Reduces Setup Time by 50%", impact: { setup: 0.5 }, icon: 'ph-arrows-left-right', edu: "Single-Minute Exchange of Die (SMED) is a Lean technique to convert internal setup elements to external, minimizing line stoppage during product changeovers." },
+            { id: 'spares', cat: 'Availability', name: "Spare Parts Kitting", cost: 4000, desc: "Reduces Breakdown Time by 10%", impact: { breakdown: 0.9 }, icon: 'ph-wrench', edu: "Organizing critical spares in 'Kits' near the machine reduces the 'Mean Time To Repair' (MTTR) by eliminating time spent searching for tools and parts." },
+            { id: 'auto_maint', cat: 'Availability', name: "Autonomous Maint.", cost: 8000, desc: "Reduces Breakdown 15%, Setup 10%", impact: { breakdown: 0.85, setup: 0.9 }, icon: 'ph-users-three', edu: "Training operators to perform daily cleaning, inspection, and lubrication (CIL) empowers them to spot abnormalities early, preventing major failures." },
+            { id: 'thermal', cat: 'Availability', name: "Thermography Cam", cost: 6000, desc: "Reduces Breakdown by 12%", impact: { breakdown: 0.88 }, icon: 'ph-thermometer', edu: "Thermal imaging detects overheating electrical components or friction points invisible to the naked eye, preventing electrical fires and seizure." },
+            { id: 'align', cat: 'Availability', name: "Laser Alignment", cost: 3000, desc: "Reduces Setup by 15%", impact: { setup: 0.85 }, icon: 'ph-crosshair', edu: "Precision laser alignment of shafts and belts reduces vibration and energy consumption, extending asset life and speeding up re-assembly." },
+            { id: 'quick_change', cat: 'Availability', name: "Quick-Change Tooling", cost: 15000, desc: "Reduces Setup by 70%", impact: { setup: 0.3 }, icon: 'ph-lightning', edu: "Tool-less changeover mechanisms (clamps vs bolts) are the gold standard for agile manufacturing, allowing instant format switches." },
+
+            { id: 'guide', cat: 'Performance', name: "Low-Friction Guides", cost: 15000, desc: "Inc speed to 380 bpm", impact: { speed: 380 }, icon: 'ph-road-horizon', edu: "Reducing coefficient of friction on conveyor rails prevents bottle tipping at high speeds, directly unlocking higher throughput capacity." },
+            { id: 'dejam', cat: 'Performance', name: "Auto De-Jammer", cost: 8000, desc: "Removes 80% Micro-stops", impact: { stops: 0.2 }, icon: 'ph-robot', edu: "Automated pneumatic arms can detect and reject fallen bottles without stopping the main drive, eliminating the #1 cause of minor stops." },
+            { id: 'buffer', cat: 'Performance', name: "Accumulation Buffer", cost: 20000, desc: "Reduces Micro-stop impact 50%", impact: { stops: 0.5 }, icon: 'ph-queue', edu: "Buffers decouple machine processes. If the Filler stops for 30s, the Labeler can keep running using buffered stock, protecting line OEE." },
+            { id: 'nozzles', cat: 'Performance', name: "High-Speed Nozzles", cost: 25000, desc: "Inc speed to 420 bpm", impact: { speed: 420 }, icon: 'ph-drop-half-bottom', edu: "Laminar flow nozzles reduce turbulence during filling, allowing for faster fluid velocity without foaming or spillage." },
+            { id: 'hmi', cat: 'Performance', name: "Digital HMI", cost: 6000, desc: "Reduces Stop duration 10%", impact: { stops: 0.9 }, icon: 'ph-monitor', edu: "Modern Human-Machine Interfaces (HMI) show exact fault locations (e.g., 'Jam at Gate 3'), speeding up operator reaction time." },
+            { id: 'inverter', cat: 'Performance', name: "Inverter Drive", cost: 10000, desc: "Inc speed to 350 bpm", impact: { speed: 350 }, icon: 'ph-faders', edu: "Variable Frequency Drives (VFD) allow the motor to ramp up/down smoothly, matching speed to downstream demand and preventing 'start/stop' jerks." },
+            { id: 'lubrication', cat: 'Performance', name: "Auto-Lubrication", cost: 4000, desc: "Smoother run, -10% stops", impact: { stops: 0.9 }, icon: 'ph-drop', edu: "Automatic grease dispensers ensure chains and bearings are perfectly lubricated while running, eliminating manual maintenance stops." },
+            { id: 'cobot', cat: 'Performance', name: "Packaging Cobot", cost: 22000, desc: "Inc speed to 400 bpm", impact: { speed: 400 }, icon: 'ph-android-logo', edu: "Collaborative Robots (Cobots) assist with end-of-line case packing, removing the human bottleneck in physical handling at high speeds." },
+
+            { id: 'vision', cat: 'Quality', name: "AI Vision System", cost: 14000, desc: "Reduces Reject Rate to 1%", impact: { rejects: 0.01 }, icon: 'ph-eye', edu: "Computer Vision algorithms inspect every single unit for cap alignment, fill level, and label skew, far outperforming random human sampling." },
+            { id: 'material', cat: 'Quality', name: "Premium Material", cost: 0, desc: "Rejects -50%, Margin -$0.05", impact: { rejects: 0.5 }, marginHit: 0.05, icon: 'ph-package', edu: "Using higher-grade preforms or labels costs more per unit (COGS) but can drastically reduce scrap rates caused by material defects." },
+            { id: 'poka', cat: 'Quality', name: "Poka-Yoke Fixtures", cost: 6000, desc: "Reduces Rejects by 30%", impact: { rejects: 0.7 }, icon: 'ph-shield-check', edu: "Poka-Yoke (Error Proofing) involves physical guides that make it impossible to insert a bottle incorrectly, preventing defects at the source." },
+            { id: 'weight', cat: 'Quality', name: "Inline Checkweigher", cost: 10000, desc: "Reduces Rejects by 20%", impact: { rejects: 0.8 }, icon: 'ph-scales', edu: "Dynamic checkweighers verify fill volume by weight at speed, rejecting only the specific bad units rather than scrapping whole batches." },
+            { id: 'temp', cat: 'Quality', name: "Temp Control Unit", cost: 4500, desc: "Reduces Rejects by 15%", impact: { rejects: 0.85 }, icon: 'ph-thermometer', edu: "Consistent temperature is vital for sealing. PID controllers ensure the heat tunnel stays within tolerance, preventing loose shrink wraps." },
+            { id: 'xray', cat: 'Quality', name: "X-Ray Inspection", cost: 18000, desc: "Reduces Rejects to 2%", impact: { rejects: 0.02 }, icon: 'ph-bone', edu: "X-Ray detection can see inside opaque containers to find foreign contaminants (glass, metal) that standard vision systems miss." },
+            { id: 'spc', cat: 'Quality', name: "SPC Software", cost: 5000, desc: "Reduces Rejects by 10%", impact: { rejects: 0.9 }, icon: 'ph-chart-line-up', edu: "Statistical Process Control (SPC) software tracks trends (CpK) and alerts operators when the process is drifting before it actually produces bad parts." },
+            { id: 'rejector', cat: 'Quality', name: "Auto-Rejector", cost: 7500, desc: "Prevents downstream scrap (-15%)", impact: { rejects: 0.85 }, icon: 'ph-trash', edu: "A precision 'Soft Reject' system pushes bad bottles off the line gently without tipping others over, preventing the domino effect of waste." }
         ];
 
         const calculateStats = (cart) => {
@@ -297,12 +315,199 @@
         };
 
         // ==========================================
-        // BACKEND SERVICES (HYBRID ARCHITECTURE)
+        // PDF EXPORT ENGINE (Cyberpunk Dashboard V3 - Refined)
+        // ==========================================
+        const generatePDFReport = (playerName, scoreData) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape', 'mm', 'a4');
+            
+            // THEME COLORS
+            const BG = [11, 14, 20];        // #0b0e14
+            const CARD = [21, 26, 35];      // #151a23
+            const ACCENT = [0, 240, 255];   // #00f0ff
+            const SUCCESS = [0, 255, 148];  // #00ff94
+            const DANGER = [255, 46, 84];   // #ff2e54
+            const TEXT_MAIN = [255, 255, 255];
+            const TEXT_DIM = [148, 163, 184];
+            
+            // Draw Helpers
+            const drawCard = (x, y, w, h, title) => {
+                doc.setFillColor(...CARD);
+                doc.setDrawColor(51, 65, 85); 
+                doc.roundedRect(x, y, w, h, 3, 3, 'FD');
+                if(title) {
+                    doc.setFontSize(9);
+                    doc.setTextColor(...TEXT_DIM);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(title.toUpperCase(), x + 5, y + 8);
+                }
+            };
+
+            const drawMetricCircle = (x, y, val, base, label) => {
+                const r = 22; // Increased radius
+                const cx = x + r;
+                const cy = y + r + 5;
+                const diff = val - base;
+                const color = diff >= 0 ? SUCCESS : DANGER;
+                
+                // Draw Ring
+                doc.setDrawColor(...color);
+                doc.setLineWidth(2.5);
+                doc.circle(cx, cy, r, 'S');
+                
+                // Draw Value
+                doc.setTextColor(...TEXT_MAIN);
+                doc.setFontSize(18); // Larger text
+                doc.setFont("helvetica", "bold");
+                doc.text((val*100).toFixed(0) + '%', cx, cy + 2, {align:'center'});
+                
+                // Draw Label
+                doc.setTextColor(...TEXT_DIM);
+                doc.setFontSize(9);
+                doc.text(label.toUpperCase(), cx, y, {align:'center'}); // Moved Label above circle
+                
+                // Draw Delta
+                const sign = diff >= 0 ? '+' : '';
+                doc.setTextColor(...color);
+                doc.setFontSize(10);
+                doc.text(`${sign}${(diff*100).toFixed(1)}%`, cx, cy + 10, {align:'center'});
+            };
+
+            // --- PAGE 1: DASHBOARD ---
+            doc.setFillColor(...BG);
+            doc.rect(0,0,297,210,'F');
+
+            // Header
+            doc.setFontSize(24);
+            doc.setTextColor(...ACCENT);
+            doc.setFont("helvetica", "bold");
+            doc.text("MISSION DASHBOARD", 15, 20);
+            doc.setFontSize(10);
+            doc.setTextColor(...TEXT_MAIN);
+            doc.text(`OPERATOR: ${playerName.toUpperCase()}`, 15, 30);
+            
+            // 1. OEE GAUGE CLUSTER (Improved Spacing)
+            drawCard(15, 40, 267, 75, "OEE & Losses");
+            
+            // Centering circles better
+            const gap = 65;
+            const startX = 35;
+            
+            // OEE (Center)
+            drawMetricCircle(startX, 55, scoreData.oee, 0.46, "OEE");
+            // Availability
+            drawMetricCircle(startX + gap, 55, scoreData.availPct, 0.75, "Availability");
+            // Performance
+            drawMetricCircle(startX + gap*2, 55, scoreData.perfPct, 0.667, "Performance");
+            // Quality
+            drawMetricCircle(startX + gap*3, 55, scoreData.qualPct, 0.92, "Quality");
+
+            // 2. FINANCIALS
+            drawCard(15, 125, 130, 60, "Financial Performance");
+            
+            doc.setFontSize(10);
+            doc.setTextColor(...TEXT_DIM);
+            doc.text("NET PROFIT", 25, 140);
+            doc.setFontSize(28);
+            doc.setTextColor(...SUCCESS);
+            doc.text(`$${scoreData.profit.toLocaleString(undefined, {maximumFractionDigits:0})}`, 25, 152);
+            
+            // Profit Increase
+            const pDiff = scoreData.profit - scoreData.baseProfit;
+            const pPct = (pDiff / scoreData.baseProfit) * 100;
+            doc.setFontSize(12);
+            doc.setTextColor(...SUCCESS); // Always profit improvement in this game context usually
+            doc.text(`+${pPct.toFixed(1)}% vs Baseline`, 25, 162);
+
+            doc.setFontSize(10);
+            doc.setTextColor(...TEXT_DIM);
+            doc.text("ROI", 85, 140);
+            doc.setFontSize(22);
+            doc.setTextColor(...ACCENT);
+            doc.text(`${scoreData.roi.toFixed(0)}%`, 85, 152);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(...TEXT_DIM);
+            doc.text("CAPEX SPENT", 85, 165);
+            doc.setFontSize(14);
+            doc.setTextColor(...TEXT_MAIN);
+            doc.text(`$${scoreData.cost.toLocaleString()}`, 85, 175);
+
+
+            // 3. VOLUME
+            drawCard(155, 125, 127, 60, "Production Output");
+            const baselineVol = 5299200; 
+            
+            doc.setFontSize(10);
+            doc.setTextColor(...TEXT_DIM);
+            doc.text("TOTAL UNITS PRODUCED", 165, 140);
+            doc.setFontSize(28);
+            doc.setTextColor(...TEXT_MAIN);
+            doc.text(Math.floor(scoreData.totalProd).toLocaleString(), 165, 152);
+            
+            const vDiff = scoreData.totalProd - baselineVol;
+            const vPct = (vDiff / baselineVol) * 100;
+            const vCol = vDiff >= 0 ? SUCCESS : DANGER;
+            const vSign = vDiff >= 0 ? '+' : '';
+            
+            doc.setTextColor(...vCol);
+            doc.setFontSize(12);
+            doc.text(`${vSign}${Math.floor(vDiff).toLocaleString()} units`, 165, 162);
+            doc.text(`${vSign}${vPct.toFixed(1)}% vs Baseline`, 165, 170);
+
+
+            // --- PAGE 2: STRATEGY LOG ---
+            doc.addPage();
+            doc.setFillColor(...BG);
+            doc.rect(0,0,297,210,'F');
+            
+            doc.setFontSize(24);
+            doc.setTextColor(...ACCENT);
+            doc.text("STRATEGY LOG", 15, 20);
+            
+            drawCard(15, 30, 267, 160, "Upgrade Manifest");
+            
+            const tableData = scoreData.cart.map(id => {
+                const u = UPGRADES.find(x => x.id === id);
+                return [u.cat.toUpperCase(), u.name, `$${u.cost.toLocaleString()}`, u.desc];
+            });
+
+            doc.autoTable({
+                startY: 40,
+                head: [['CATEGORY', 'UPGRADE', 'COST', 'IMPACT']],
+                body: tableData,
+                theme: 'plain',
+                margin: { left: 20 },
+                tableWidth: 257,
+                headStyles: { 
+                    fillColor: BG, 
+                    textColor: ACCENT, 
+                    fontStyle: 'bold',
+                    fontSize: 9
+                },
+                bodyStyles: {
+                    fillColor: CARD,
+                    textColor: TEXT_MAIN,
+                    fontSize: 10,
+                    cellPadding: 3
+                },
+                columnStyles: {
+                    0: { cellWidth: 40, textColor: TEXT_DIM, fontStyle:'bold' },
+                    1: { cellWidth: 70, fontStyle: 'bold' },
+                    2: { cellWidth: 40, halign: 'right', textColor: SUCCESS },
+                    3: { textColor: TEXT_DIM }
+                }
+            });
+            
+            doc.save(`OEE_Report_${playerName}.pdf`);
+        };
+
+        // ==========================================
+        // BACKEND SERVICES
         // ==========================================
 
         const MockAPI = {
             async signIn() {
-                // Simulate net lag
                 await new Promise(r => setTimeout(r, 500));
                 const uid = 'offline-' + Math.floor(Math.random()*10000);
                 return { uid, isAnonymous: true };
@@ -329,17 +534,12 @@
                 return data;
             },
             subscribe(code, callback) {
-                // Initial call
                 const raw = localStorage.getItem(`room:${code}`);
                 if(raw) callback(JSON.parse(raw));
-
                 const handler = (e) => {
-                    if (e.key === `room:${code}` && e.newValue) {
-                        callback(JSON.parse(e.newValue));
-                    }
+                    if (e.key === `room:${code}` && e.newValue) callback(JSON.parse(e.newValue));
                 };
                 window.addEventListener('storage', handler);
-                // Also poll for local tab changes
                 const interval = setInterval(() => {
                     const current = localStorage.getItem(`room:${code}`);
                     if(current) callback(JSON.parse(current));
@@ -363,12 +563,23 @@
                 localStorage.setItem(`room:${code}`, JSON.stringify(data));
             },
             async updateRoom(code, data) {
-                // Merge data
                 const raw = localStorage.getItem(`room:${code}`);
                 if (!raw) return;
                 const current = JSON.parse(raw);
                 const updated = { ...current, ...data };
                 localStorage.setItem(`room:${code}`, JSON.stringify(updated));
+            },
+            // Mock implementation of Resume
+            async resumeGame(code) {
+                const raw = localStorage.getItem(`room:${code}`);
+                if(!raw) return;
+                const data = JSON.parse(raw);
+                if (data.timeRemaining) {
+                    data.status = 'playing';
+                    // Apply the remaining time from NOW
+                    data.endTime = Date.now() + data.timeRemaining;
+                    localStorage.setItem(`room:${code}`, JSON.stringify(data));
+                }
             }
         };
 
@@ -390,7 +601,6 @@
             },
             async joinRoom(code, name, uid) {
                 const ref = db.collection('rooms').doc(code);
-                // Transaction to prevent race conditions on join
                 await db.runTransaction(async (t) => {
                     const doc = await t.get(ref);
                     if (!doc.exists) throw new Error("Room not found");
@@ -410,11 +620,9 @@
             async updateRoom(code, data) {
                 await db.collection('rooms').doc(code).update(data);
             },
-            // ROBUST SUBMIT SCORE WITH RETRIES & JITTER
             async submitScore(code, uid, scoreData) {
                 const ref = db.collection('rooms').doc(code);
                 const maxRetries = 5;
-                
                 for (let i = 0; i < maxRetries; i++) {
                     try {
                         await db.runTransaction(async (t) => {
@@ -422,28 +630,38 @@
                             if (!doc.exists) throw new Error("Room closed");
                             const data = doc.data();
                             const players = data.players || [];
-                            
-                            // Update player score
                             const updatedPlayers = players.map(p => {
                                 if (p.uid === uid) return { ...p, score: scoreData };
                                 return p;
                             });
-
                             const allFinished = updatedPlayers.every(p => p.score);
                             const updatePayload = { players: updatedPlayers };
                             if (allFinished) updatePayload.status = 'finished';
-
                             t.update(ref, updatePayload);
                         });
-                        return; // Success!
+                        return;
                     } catch (e) {
-                        console.warn(`Submit attempt ${i+1} failed. Retrying...`, e);
                         if (i === maxRetries - 1) throw e;
-                        // Random jitter between 200ms and 1000ms + exponential backoff
                         const jitter = Math.random() * 800 + 200 + (i * 200);
                         await new Promise(r => setTimeout(r, jitter));
                     }
                 }
+            },
+            // Real implementation of Resume
+            async resumeGame(code) {
+                const ref = db.collection('rooms').doc(code);
+                await db.runTransaction(async (t) => {
+                    const doc = await t.get(ref);
+                    if (!doc.exists) throw "Room not found";
+                    const data = doc.data();
+                    if (data.timeRemaining) {
+                        // Calculate new end time based on NOW
+                        t.update(ref, {
+                            status: 'playing',
+                            endTime: Date.now() + data.timeRemaining
+                        });
+                    }
+                });
             }
         };
 
@@ -633,21 +851,24 @@
             );
         };
 
-        const GameBoard = ({ endTime, startTime, onFinish }) => {
+        const GameBoard = ({ endTime, startTime, onFinish, isHost, onPause, onResume, onEndGame, status }) => {
             const [timeLeft, setTimeLeft] = useState(0);
             const [activeTab, setActiveTab] = useState('Availability');
             const [cart, setCart] = useState([]);
+            const [resuming, setResuming] = useState(false); // New loading state for feedback
             const stats = useMemo(() => calculateStats(cart), [cart]);
 
             useEffect(() => {
                 const timer = setInterval(() => {
+                    if (status === 'paused') return; // Freeze timer visually
+                    
                     const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
                     setTimeLeft(remaining);
                     if (remaining === 180) SoundFX.urgency();
-                    if (remaining === 0) onFinish(cart, (endTime - startTime)/1000);
+                    if (remaining === 0 && status === 'playing') onFinish(cart, (endTime - startTime)/1000);
                 }, 1000);
                 return () => clearInterval(timer);
-            }, [endTime, cart, startTime]);
+            }, [endTime, cart, startTime, status]);
 
             const handleCommit = () => {
                 const timeTaken = (Date.now() - startTime) / 1000;
@@ -667,6 +888,12 @@
                 }
             };
 
+            const handleResumeClick = async () => {
+                setResuming(true);
+                await onResume();
+                setResuming(false);
+            };
+
             const formatMoney = n => n.toLocaleString('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits:0});
             const items = UPGRADES.filter(u => u.cat === activeTab);
 
@@ -679,7 +906,18 @@
             );
 
             return (
-                <div className="h-screen flex flex-col bg-bg text-slate-200 overflow-hidden font-sans">
+                <div className="h-screen flex flex-col bg-bg text-slate-200 overflow-hidden font-sans relative">
+                    {/* PAUSE OVERLAY */}
+                    {status === 'paused' && (
+                        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center backdrop-blur-sm">
+                            <div className="text-center">
+                                <i className="ph-fill ph-pause-circle text-6xl text-warn mb-4 animate-pulse"></i>
+                                <h2 className="text-4xl font-bold text-white tracking-widest uppercase">Simulation Paused</h2>
+                                <p className="text-slate-400 mt-2">Awaiting Host Command...</p>
+                            </div>
+                        </div>
+                    )}
+
                     <header className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-panel z-20 shadow-lg">
                         <div className="flex items-center gap-4">
                             <div className="w-8 h-8 bg-accent text-black flex items-center justify-center font-bold rounded"><i className="ph-bold ph-factory"></i></div>
@@ -712,11 +950,25 @@
                                             <div key={item.id} onClick={() => (isSel || isAffordable) && toggleItem(item)} className={`tech-card p-4 rounded cursor-pointer transition-all group relative hover:-translate-y-1 ${isSel ? 'active' : ''} ${!isSel && !isAffordable ? 'opacity-40 grayscale' : ''}`}>
                                                 <div className="flex justify-between items-start mb-3">
                                                     <i className={`ph-fill ${item.icon} text-2xl ${isSel ? 'text-accent' : 'text-slate-600 group-hover:text-white'}`}></i>
-                                                    <div className={`font-mono font-bold ${isSel ? 'text-white' : 'text-slate-400'}`}>{formatMoney(item.cost)}</div>
+                                                    
+                                                    {/* RECTIFIED TOOLTIP & COST LAYOUT */}
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`font-mono font-bold ${isSel ? 'text-white' : 'text-slate-400'}`}>{formatMoney(item.cost)}</div>
+                                                        <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center text-[10px] text-slate-300 hover:bg-accent hover:text-black z-10 cursor-help">
+                                                            <i className="ph-bold ph-info"></i>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <h4 className="font-bold text-white mb-1 leading-tight">{item.name}</h4>
                                                 <p className="text-[11px] text-slate-400 leading-relaxed h-8 overflow-hidden">{item.desc}</p>
                                                 {isSel && <div className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full shadow-[0_0_10px_#38bdf8]"></div>}
+                                                
+                                                {/* EDUCATIONAL TOOLTIP CONTENT */}
+                                                <div className="tech-tooltip absolute inset-x-0 bottom-full mb-2 p-3 bg-slate-900 border border-slate-600 rounded shadow-xl z-50 text-xs text-slate-200 leading-relaxed pointer-events-none">
+                                                    <div className="text-accent font-bold mb-1 uppercase tracking-wider">Industry Insight</div>
+                                                    {item.edu}
+                                                    <div className="absolute bottom-[-6px] left-1/2 transform -translate-x-1/2 w-3 h-3 bg-slate-900 border-b border-r border-slate-600 rotate-45"></div>
+                                                </div>
                                             </div>
                                         )
                                     })}
@@ -724,7 +976,31 @@
                             </div>
                         </main>
 
-                        <aside className="w-96 bg-panel border-l border-slate-800 flex flex-col z-20 shadow-2xl relative sidebar-grid">
+                        <aside className="w-96 bg-panel border-l border-slate-800 flex flex-col z-[60] shadow-2xl relative sidebar-grid">
+                            
+                            {/* HOST CONTROLS */}
+                            {isHost && (
+                                <div className="p-4 bg-slate-900/80 border-b border-slate-700">
+                                    <div className="text-[10px] font-bold text-warn uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <i className="ph-fill ph-crown"></i> Host Override
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {status === 'paused' ? (
+                                            <button onClick={handleResumeClick} disabled={resuming} className="flex-1 bg-success/20 hover:bg-success/40 text-success border border-success/50 rounded py-2 text-xs font-bold transition-all disabled:opacity-50">
+                                                <i className={`ph-fill ${resuming ? 'ph-spinner animate-spin' : 'ph-play'}`}></i> {resuming ? 'RESUMING...' : 'RESUME'}
+                                            </button>
+                                        ) : (
+                                            <button onClick={onPause} className="flex-1 bg-warn/20 hover:bg-warn/40 text-warn border border-warn/50 rounded py-2 text-xs font-bold transition-all">
+                                                <i className="ph-fill ph-pause"></i> PAUSE
+                                            </button>
+                                        )}
+                                        <button onClick={onEndGame} className="flex-1 bg-danger/20 hover:bg-danger/40 text-danger border border-danger/50 rounded py-2 text-xs font-bold transition-all">
+                                            <i className="ph-fill ph-stop"></i> END SIM
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="p-5 border-b border-slate-800 bg-slate-900/30">
                                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i className="ph-fill ph-info"></i> CASE FACTS</h3>
                                 <div className="space-y-2 font-mono text-xs text-slate-400">
@@ -785,7 +1061,6 @@
                 return timeA - timeB;
             });
 
-            // Calculate submitted counts
             const submittedCount = players.filter(p => p.score).length;
             const totalCount = players.length;
 
@@ -806,8 +1081,15 @@
                     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setDetails(null)}>
                         <div className="tech-card p-8 max-w-4xl w-full rounded-xl bg-[#0F1115]" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-between mb-6 border-b border-slate-800 pb-4">
-                                <h2 className="text-3xl font-bold text-white">Strategy Audit: <span className="text-accent">{player.name}</span></h2>
-                                <button onClick={() => setDetails(null)}><i className="ph-bold ph-x text-slate-500 hover:text-white text-2xl"></i></button>
+                                <div>
+                                    <h2 className="text-3xl font-bold text-white">Strategy Audit: <span className="text-accent">{player.name}</span></h2>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => generatePDFReport(player.name, s)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-widest rounded border border-slate-600 transition-all">
+                                        <i className="ph-bold ph-file-pdf text-red-400"></i> Export PDF Report
+                                    </button>
+                                    <button onClick={() => setDetails(null)}><i className="ph-bold ph-x text-slate-500 hover:text-white text-2xl"></i></button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 mb-6 font-mono">
                                 <div className="p-3 bg-slate-900 rounded border border-slate-700 text-center">
@@ -904,6 +1186,7 @@
             const [players, setPlayers] = useState([]);
             const [endTime, setEndTime] = useState(null);
             const [startTime, setStartTime] = useState(null);
+            const [status, setStatus] = useState('waiting'); // 'waiting', 'playing', 'paused', 'finished'
             const [isHost, setIsHost] = useState(false);
             const [error, setError] = useState(null);
 
@@ -939,6 +1222,7 @@
                     setPlayers(roomData.players || []);
                     setEndTime(roomData.endTime);
                     setStartTime(roomData.startTime);
+                    setStatus(roomData.status);
                     
                     if (roomData.status === 'playing' && view === 'waiting') setView('game');
                     if (roomData.status === 'finished' && view === 'game') setView('results');
@@ -989,6 +1273,25 @@
                 }
             };
 
+            const handlePause = async () => {
+                const remaining = endTime - Date.now();
+                await Backend.updateRoom(roomCode, {
+                    status: 'paused',
+                    timeRemaining: remaining
+                });
+            };
+
+            const handleResume = async () => {
+                await Backend.resumeGame(roomCode);
+            };
+
+            const handleEndGame = async () => {
+                await Backend.updateRoom(roomCode, {
+                    status: 'finished',
+                    endTime: Date.now() // Force timer end
+                });
+            };
+
             const handleFinish = async (cart, timeTaken) => {
                 const res = calculateStats(cart); 
                 res.cart = cart;
@@ -998,7 +1301,6 @@
                     if (Backend.submitScore) {
                         await Backend.submitScore(roomCode, user.uid, res);
                     } else {
-                        // Fallback for MockAPI
                         const updatedPlayers = players.map(p => {
                             if (p.uid === user.uid) return { ...p, score: res };
                             return p;
@@ -1022,7 +1324,16 @@
                 <React.Fragment>
                     {view === 'lobby' && <Lobby user={user} onCreate={handleCreate} onJoin={handleJoin} />}
                     {view === 'waiting' && <WaitingRoom roomCode={roomCode} players={players} isHost={isHost} onStart={handleStart} />}
-                    {view === 'game' && <GameBoard endTime={endTime} startTime={startTime} onFinish={handleFinish} />}
+                    {view === 'game' && <GameBoard 
+                        endTime={endTime} 
+                        startTime={startTime} 
+                        onFinish={handleFinish} 
+                        isHost={isHost}
+                        onPause={handlePause}
+                        onResume={handleResume}
+                        onEndGame={handleEndGame}
+                        status={status}
+                    />}
                     {view === 'results' && <Leaderboard roomCode={roomCode} players={players} onExit={() => setView('lobby')} />}
                 </React.Fragment>
             );
