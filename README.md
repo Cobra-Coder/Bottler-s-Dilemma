@@ -1,16 +1,20 @@
-#🏭 Bottler's Dilemma: OEE Tycoon
+# 🏭 Bottler's Dilemma: OEE Tycoon
+
 A high-stakes, cyberpunk-themed manufacturing simulation game running entirely in a single HTML file.
-🕹️ About The Game
+
+# 🕹️ About The Game
 Bottler's Dilemma is a realtime multiplayer simulation game designed to teach the concepts of OEE (Overall Equipment Effectiveness).
 Players act as Plant Managers with a limited budget of $50,000. You have 3 minutes to upgrade a failing production line. Every decision impacts Availability, Performance, and Quality.
 Compete against friends or colleagues in a live lobby to see who can achieve the highest ROI before the shift ends.
-✨ Key Features
+
+# ✨ Key Features
 •	Zero-Build Architecture: The entire application (React, Tailwind, Logic, Styles) lives in a single index.html file. No npm install, no webpack, no hassle.
 •	Hybrid Multiplayer: * Online Mode: Real-time lobby system powered by Firebase Firestore.
 o	Offline Mode: Fully playable locally using localStorage simulation.
 •	Cyberpunk Aesthetic: Custom SCADA-style UI with immersive sound effects.
 •	Educational Logic: Real-world manufacturing calculations (Six Big Losses, Unit Margins, CapEx ROI).
-🚀 How to Play
+
+# 🚀 How to Play
 1.	Host a Room: Create a lobby and share the 4-letter Room Code.
 2.	Join: Players enter their name and the code to join the waiting room.
 3.	Strategize: You have 3 minutes.
@@ -18,7 +22,8 @@ o	Buy Servo Motors to fix breakdowns.
 o	Install AI Vision to reduce scrap.
 o	Upgrade Nozzles to increase speed.
 4.	Win: The leaderboard ranks players by Profit and ROI.
-🛠️ Deployment & Setup
+
+# 🛠️ Deployment & Setup
 Option 1: Play Immediately
 Simply download the index.html file and open it in your browser. By default, it runs in Offline/Mock Mode.
 Option 2: Host Your Own (Multiplayer)
@@ -41,17 +46,20 @@ o	Set const USE_FIREBASE = true;.
 o	Paste your Firebase Config keys in the firebaseConfig object.
 6.	Deploy:
 o	Drag and drop the file into Netlify Drop or enable GitHub Pages.
-💸 Cost to Run
+
+# 💸 Cost to Run
 $0.00 / month. This project uses the Firebase Spark Plan (Free Tier).
 •	Hosting: Free (GitHub Pages/Netlify)
 •	Database: Free (up to 50k reads/day)
 •	Auth: Free
-🤝 Contributing
+
+# 🤝 Contributing
 Feel free to fork this project! Ideas for improvement:
 •	Add a "Spectator Mode" for the host.
 •	Create different difficulty scenarios (e.g., "Budget Cuts" mode).
 •	Add a chat feature in the lobby.
-📄 License
+
+# 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
-Original Concept & Design by Madhusudan Chhangani
+# Original Concept & Design by Madhusudan Chhangani
 
