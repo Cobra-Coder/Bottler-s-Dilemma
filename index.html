@@ -132,12 +132,13 @@
         // ==========================================
         // PASTE FIREBASE CONFIG HERE
         const firebaseConfig = {
-            	apiKey: "AIzaSyBRODmPlfRCoh3s1uCqTutTftBNaFRfbJ4",
+           	apiKey: "AIzaSyBRODmPlfRCoh3s1uCqTutTftBNaFRfbJ4",
   		authDomain: "oee-tycoon-free.firebaseapp.com",
   		projectId: "oee-tycoon-free",
   		storageBucket: "oee-tycoon-free.firebasestorage.app",
   		messagingSenderId: "301892884988",
-  		appId: "1:301892884988:web:2abeddbb5f4b17bb4aba79"
+  		appId: "1:301892884988:web:2abeddbb5f4b17bb4aba79",
+  		measurementId: "G-ELFGFKP7WQ"
         };
 
         let db = null;
@@ -348,6 +349,19 @@
                     clearInterval(interval);
                 };
             },
+            async submitScore(code, uid, scoreData) {
+                const raw = localStorage.getItem(`room:${code}`);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                const updatedPlayers = data.players.map(p => {
+                    if (p.uid === uid) return { ...p, score: scoreData };
+                    return p;
+                });
+                data.players = updatedPlayers;
+                const allFinished = updatedPlayers.every(p => p.score);
+                if (allFinished) data.status = 'finished';
+                localStorage.setItem(`room:${code}`, JSON.stringify(data));
+            },
             async updateRoom(code, data) {
                 // Merge data
                 const raw = localStorage.getItem(`room:${code}`);
@@ -355,8 +369,6 @@
                 const current = JSON.parse(raw);
                 const updated = { ...current, ...data };
                 localStorage.setItem(`room:${code}`, JSON.stringify(updated));
-                // Dispatch event for same-tab updates if needed (though local storage event fires only on other tabs)
-                // In a real app we'd use a BroadcastChannel, but let's stick to polling in subscribe
             }
         };
 
@@ -397,6 +409,41 @@
             },
             async updateRoom(code, data) {
                 await db.collection('rooms').doc(code).update(data);
+            },
+            // ROBUST SUBMIT SCORE WITH RETRIES & JITTER
+            async submitScore(code, uid, scoreData) {
+                const ref = db.collection('rooms').doc(code);
+                const maxRetries = 5;
+                
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        await db.runTransaction(async (t) => {
+                            const doc = await t.get(ref);
+                            if (!doc.exists) throw new Error("Room closed");
+                            const data = doc.data();
+                            const players = data.players || [];
+                            
+                            // Update player score
+                            const updatedPlayers = players.map(p => {
+                                if (p.uid === uid) return { ...p, score: scoreData };
+                                return p;
+                            });
+
+                            const allFinished = updatedPlayers.every(p => p.score);
+                            const updatePayload = { players: updatedPlayers };
+                            if (allFinished) updatePayload.status = 'finished';
+
+                            t.update(ref, updatePayload);
+                        });
+                        return; // Success!
+                    } catch (e) {
+                        console.warn(`Submit attempt ${i+1} failed. Retrying...`, e);
+                        if (i === maxRetries - 1) throw e;
+                        // Random jitter between 200ms and 1000ms + exponential backoff
+                        const jitter = Math.random() * 800 + 200 + (i * 200);
+                        await new Promise(r => setTimeout(r, jitter));
+                    }
+                }
             }
         };
 
@@ -550,15 +597,19 @@
                             <span className="text-slate-400 font-mono text-sm">OPERATORS ONLINE: <span className="text-white font-bold text-lg ml-2">{players.length}</span></span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-12 w-full max-w-3xl">
-                        {players.map((p, i) => (
-                            <div key={i} className="scada-panel p-4 flex items-center gap-3 animate-enter">
-                                <div className={`w-3 h-3 rounded-full ${p.isHost ? 'bg-accent shadow-[0_0_10px_cyan]' : 'bg-slate-500'}`}></div>
-                                <span className="font-mono text-white truncate">{p.name}</span>
-                                {p.isHost && <span className="ml-auto text-[10px] bg-accent text-black px-2 rounded font-bold">HOST</span>}
-                            </div>
-                        ))}
+                    
+                    <div className="w-full max-w-3xl mb-12 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {players.map((p, i) => (
+                                <div key={i} className="scada-panel p-4 flex items-center gap-3 animate-enter">
+                                    <div className={`w-3 h-3 rounded-full ${p.isHost ? 'bg-accent shadow-[0_0_10px_cyan]' : 'bg-slate-500'}`}></div>
+                                    <span className="font-mono text-white truncate">{p.name}</span>
+                                    {p.isHost && <span className="ml-auto text-[10px] bg-accent text-black px-2 rounded font-bold">HOST</span>}
+                                </div>
+                            ))}
+                        </div>
                     </div>
+
                     {isHost ? (
                         <div className="flex flex-col items-center gap-6">
                             <div className="flex items-center gap-4 bg-panel p-2 rounded border border-slate-700">
@@ -734,6 +785,10 @@
                 return timeA - timeB;
             });
 
+            // Calculate submitted counts
+            const submittedCount = players.filter(p => p.score).length;
+            const totalCount = players.length;
+
             const optimal = useMemo(() => solveOptimal(), []);
 
             useEffect(() => SoundFX.win(), []);
@@ -792,7 +847,10 @@
                         <div className="flex justify-between items-end mb-8 border-b border-slate-800 pb-6">
                             <div>
                                 <h1 className="text-5xl font-bold text-white tracking-tight uppercase">Leaderboard</h1>
-                                <div className="text-accent font-mono">ROOM: {roomCode}</div>
+                                <div className="text-accent font-mono">
+                                    ROOM: {roomCode}
+                                    <span className="ml-4 text-slate-500 text-sm">[{submittedCount}/{totalCount} SUBMITTED]</span>
+                                </div>
                             </div>
                             <button onClick={onExit} className="text-slate-400 hover:text-white uppercase text-sm font-bold tracking-widest">Exit to Lobby</button>
                         </div>
@@ -808,24 +866,26 @@
                         
                         <div className="grid grid-cols-12 p-2 mb-2 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-800">
                             <div className="col-span-1">Rank</div>
-                            <div className="col-span-4">Operator</div>
+                            <div className="col-span-3">Operator</div>
+                            <div className="col-span-2 text-right">OEE</div>
                             <div className="col-span-2 text-right">Profit</div>
                             <div className="col-span-2 text-right">ROI</div>
-                            <div className="col-span-2 text-right">Time</div>
+                            <div className="col-span-1 text-right">Time</div>
                             <div className="col-span-1 text-right">View</div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                             {sorted.map((p, i) => (
                                 <div key={i} className={`scada-panel p-4 rounded grid grid-cols-12 items-center transition-all hover:bg-slate-800 ${i===0 ? 'border-l-4 border-l-warn' : ''}`}>
                                     <div className="col-span-1 font-mono text-slate-500">#{i+1}</div>
-                                    <div className="col-span-4 font-bold text-white flex items-center gap-2">
+                                    <div className="col-span-3 font-bold text-white flex items-center gap-2 truncate">
                                         {p.name}
                                         {i===0 && <i className="ph-fill ph-crown text-warn"></i>}
                                     </div>
+                                    <div className="col-span-2 text-right font-mono text-white">{(p.score?.oee * 100).toFixed(1)}%</div>
                                     <div className="col-span-2 text-right font-mono text-success">${p.score?.profit.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
                                     <div className="col-span-2 text-right font-mono text-accent">{p.score?.roi.toFixed(0)}%</div>
-                                    <div className="col-span-2 text-right font-mono text-slate-400">{formatTime(p.score?.timeTaken)}</div>
+                                    <div className="col-span-1 text-right font-mono text-slate-400">{formatTime(p.score?.timeTaken)}</div>
                                     <div className="col-span-1 text-right">
                                         <button onClick={() => setDetails(p)} className="text-xs font-bold text-slate-400 hover:text-white underline decoration-slate-700 underline-offset-4">VIEW</button>
                                     </div>
@@ -849,11 +909,23 @@
 
             // Initialize User on Mount
             useEffect(() => {
+                if (USE_FIREBASE && firebaseConfig.apiKey === "YOUR_API_KEY") {
+                    setError("SETUP ERROR: You enabled Firebase but didn't paste your API Keys in the code.");
+                    return;
+                }
+
                 Backend.signIn()
                     .then(u => setUser(u))
                     .catch(e => {
                         console.error("Auth failed:", e);
-                        setError("Authenticating failed. Check console.");
+                        // Show exact error code for better debugging
+                        let msg = "Authenticating failed.";
+                        if (e.code === 'auth/operation-not-allowed') msg += " (Enable Anonymous Auth in Firebase Console)";
+                        else if (e.code === 'auth/invalid-api-key') msg += " (Invalid API Key)";
+                        else if (e.code === 'auth/project-not-found') msg += " (Project not found)";
+                        else msg += " " + e.message;
+                        
+                        setError(msg);
                     });
             }, []);
 
@@ -923,40 +995,26 @@
                 res.timeTaken = timeTaken;
                 
                 try {
-                    // Update only my score in the player list
-                    // Note: In Firestore we can't easily update array element by ID without reading first.
-                    // For Simplicity in this single file, we read-modify-write inside Backend abstraction or here.
-                    // But wait, updateRoom merges data. Arrays are tricky.
-                    // Let's rely on the Backend abstraction to handle array logic if needed or do it here.
-                    
-                    // Simple approach for this Mock/Firestore hybrid:
-                    // We need to read current state to update specific array item safely
-                    // Or use a more complex data structure (Object map instead of Array).
-                    // Given constraints, we'll do read-modify-write here for safety.
-                    
-                    // Actually, let's just push our score.
-                    // Since we have 'players' in state from subscription, we can modify that and send it.
-                    // WARNING: Concurrency issue if multiple finish same time.
-                    // IDEAL: Use Firestore arrayUnion/Remove or Maps.
-                    // FIX: We will optimistically use the local 'players' state which is synced.
-                    
-                    const updatedPlayers = players.map(p => {
-                        if (p.uid === user.uid) return { ...p, score: res };
-                        return p;
-                    });
-                    
-                    const allFinished = updatedPlayers.every(p => p.score);
-                    const updateData = { players: updatedPlayers };
-                    if (allFinished) updateData.status = 'finished';
-                    
-                    await Backend.updateRoom(roomCode, updateData);
+                    if (Backend.submitScore) {
+                        await Backend.submitScore(roomCode, user.uid, res);
+                    } else {
+                        // Fallback for MockAPI
+                        const updatedPlayers = players.map(p => {
+                            if (p.uid === user.uid) return { ...p, score: res };
+                            return p;
+                        });
+                        const allFinished = updatedPlayers.every(p => p.score);
+                        const updateData = { players: updatedPlayers };
+                        if (allFinished) updateData.status = 'finished';
+                        await Backend.updateRoom(roomCode, updateData);
+                    }
                     setView('results');
                 } catch (e) {
                     console.error("Finish failed", e);
                 }
             };
 
-            if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-danger font-mono">{error}</div>;
+            if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-danger font-mono text-center p-4"><div className="border border-danger p-4 rounded bg-danger/10"><div className="font-bold text-xl mb-2">⚠ ERROR</div>{error}</div></div>;
 
             if (!user) return <div className="min-h-screen bg-black flex items-center justify-center text-accent font-mono animate-pulse">INITIALIZING UPLINK...</div>;
 
