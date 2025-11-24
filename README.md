@@ -61,5 +61,6 @@ Feel free to fork this project! Ideas for improvement:
 
 # 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
-# Original Concept & Design by Madhusudan Chhangani
+
+Original Concept & Design by Madhusudan Chhangani
 
