@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🔥 Realistic OEE Bot Swarm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { background: #0F1115; color: #fff; font-family: monospace; }
+        .log-box { height: 400px; overflow-y: auto; background: #000; border: 1px solid #333; padding: 10px; font-size: 12px; }
+        .success { color: #00ff94; }
+        .error { color: #ff2e54; }
+        .info { color: #00f0ff; }
+        .warn { color: #ffe600; }
+    </style>
+</head>
+<body class="p-8 max-w-6xl mx-auto">
+
+    <div class="flex justify-between items-end mb-6">
+        <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">🤖 Realistic OEE Swarm Tester</h1>
+        <div class="text-xs text-gray-500">v2.0 - Logic Integrated</div>
+    </div>
+    
+    <div class="grid grid-cols-12 gap-6">
+        <!-- CONTROLS -->
+        <div class="col-span-4 space-y-4">
+            <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-lg">
+                <h2 class="font-bold mb-4 text-blue-400 uppercase tracking-widest text-xs">Step 1: Setup</h2>
+                <button onclick="initAndCreate()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded mb-2 font-bold transition-all border border-slate-600">1. Create Lobby</button>
+                <button onclick="spawnBots(20)" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded mb-2 font-bold transition-all border border-slate-600">2. Spawn 20 Bots</button>
+            </div>
+
+            <div class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-lg">
+                <h2 class="font-bold mb-4 text-green-400 uppercase tracking-widest text-xs">Step 2: Simulation</h2>
+                <p class="text-xs text-gray-400 mb-3">Starts game → Bots generate unique strategies → Bots wait random delay → Bots commit scores.</p>
+                <button onclick="runSimulation()" class="w-full bg-green-600 hover:bg-green-500 text-white py-4 rounded font-bold shadow-[0_0_15px_rgba(0,255,148,0.3)] transition-all">
+                    🚀 START GAME & AUTO-PLAY
+                </button>
+            </div>
+            
+            <div class="bg-gray-800 p-5 rounded-lg border border-gray-700">
+                <h2 class="font-bold mb-2 text-xs text-gray-400 uppercase">Live Metrics</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-[10px] text-gray-500">ROOM CODE</div>
+                        <div id="roomCode" class="text-xl font-bold text-yellow-400 font-mono">---</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-500">BOTS READY</div>
+                        <div id="botCount" class="text-xl font-bold text-white font-mono">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-500">SUCCESSFUL WRITES</div>
+                        <div id="opCount" class="text-xl font-bold text-green-400 font-mono">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-gray-500">CONTENTION ERRORS</div>
+                        <div id="errCount" class="text-xl font-bold text-red-500 font-mono">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGS -->
+        <div class="col-span-8 bg-gray-900 p-1 rounded-lg border border-gray-700 flex flex-col h-full shadow-inner">
+            <div class="bg-gray-800 px-4 py-2 text-xs font-bold text-gray-400 rounded-t flex justify-between">
+                <span>TERMINAL OUTPUT</span>
+                <button onclick="document.getElementById('logs').innerHTML=''" class="hover:text-white">CLEAR</button>
+            </div>
+            <div id="logs" class="log-box font-mono flex-1 rounded-b"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚠️ PASTE YOUR FIREBASE CONFIG HERE ⚠️
+        // ==========================================
+        const firebaseConfig = {
+           	apiKey: "AIzaSyBRODmPlfRCoh3s1uCqTutTftBNaFRfbJ4",
+  		authDomain: "oee-tycoon-free.firebaseapp.com",
+  		projectId: "oee-tycoon-free",
+  		storageBucket: "oee-tycoon-free.firebasestorage.app",
+  		messagingSenderId: "301892884988",
+  		appId: "1:301892884988:web:2abeddbb5f4b17bb4aba79",
+  		measurementId: "G-ELFGFKP7WQ"
+        };
+
+        // ==========================================
+        // 🧠 GAME ENGINE (Ported from Game File)
+        // ==========================================
+        const CASE = {
+            budget: 50000,
+            shiftDuration: 480,
+            shiftsPerMonth: 60,
+            unitMargin: 0.30,
+            costs: { downtime: 150, scrap: 2.50 },
+            baseline: { breakdown: 80, setup: 40, speed: 300, stops: 20, rejects: 0.08 }
+        };
+
+        const UPGRADES = [
+            { id: 'motor', cost: 18000, impact: { breakdown: 0.25 }, marginHit: 0 },
+            { id: 'pdm', cost: 12000, impact: { breakdown: 0.6 }, marginHit: 0 },
+            { id: 'smed', cost: 5000, impact: { setup: 0.5 }, marginHit: 0 },
+            { id: 'spares', cost: 4000, impact: { breakdown: 0.9 }, marginHit: 0 },
+            { id: 'auto_maint', cost: 8000, impact: { breakdown: 0.85, setup: 0.9 }, marginHit: 0 },
+            { id: 'thermal', cost: 6000, impact: { breakdown: 0.88 }, marginHit: 0 },
+            { id: 'align', cost: 3000, impact: { setup: 0.85 }, marginHit: 0 },
+            { id: 'quick_change', cost: 15000, impact: { setup: 0.3 }, marginHit: 0 },
+            { id: 'guide', cost: 15000, impact: { speed: 380 }, marginHit: 0 },
+            { id: 'dejam', cost: 8000, impact: { stops: 0.2 }, marginHit: 0 },
+            { id: 'buffer', cost: 20000, impact: { stops: 0.5 }, marginHit: 0 },
+            { id: 'nozzles', cost: 25000, impact: { speed: 420 }, marginHit: 0 },
+            { id: 'hmi', cost: 6000, impact: { stops: 0.9 }, marginHit: 0 },
+            { id: 'inverter', cost: 10000, impact: { speed: 350 }, marginHit: 0 },
+            { id: 'lubrication', cost: 4000, impact: { stops: 0.9 }, marginHit: 0 },
+            { id: 'cobot', cost: 22000, impact: { speed: 400 }, marginHit: 0 },
+            { id: 'vision', cost: 14000, impact: { rejects: 0.01 }, marginHit: 0 },
+            { id: 'material', cost: 0, impact: { rejects: 0.5 }, marginHit: 0.05 },
+            { id: 'poka', cost: 6000, impact: { rejects: 0.7 }, marginHit: 0 },
+            { id: 'weight', cost: 10000, impact: { rejects: 0.8 }, marginHit: 0 },
+            { id: 'temp', cost: 4500, impact: { rejects: 0.85 }, marginHit: 0 },
+            { id: 'xray', cost: 18000, impact: { rejects: 0.02 }, marginHit: 0 },
+            { id: 'spc', cost: 5000, impact: { rejects: 0.9 }, marginHit: 0 },
+            { id: 'rejector', cost: 7500, impact: { rejects: 0.85 }, marginHit: 0 }
+        ];
+
+        const calculateStats = (cart) => {
+            let stats = { ...CASE.baseline };
+            let cost = 0;
+            let margin = CASE.unitMargin;
+            cart.forEach(id => {
+                const upg = UPGRADES.find(u => u.id === id);
+                if(!upg) return;
+                cost += upg.cost;
+                if(upg.marginHit) margin -= upg.marginHit;
+                Object.keys(upg.impact).forEach(k => {
+                    const val = upg.impact[k];
+                    if (k === 'speed' || (k === 'rejects' && val < 0.05 && val > 0)) stats[k] = val; 
+                    else stats[k] *= val;
+                });
+            });
+            const availTime = CASE.shiftDuration - stats.breakdown - stats.setup;
+            const availPct = availTime / CASE.shiftDuration;
+            const speedRatio = stats.speed / 400;
+            const microStopLoss = (stats.stops * 2) / CASE.shiftDuration; 
+            const perfPct = Math.max(0, speedRatio - microStopLoss);
+            const qualPct = 1 - stats.rejects;
+            const oee = availPct * perfPct * qualPct;
+            
+            const netRunTime = availTime - (stats.stops * 2);
+            const grossProd = netRunTime * stats.speed;
+            const goodUnits = grossProd * qualPct;
+            const monthlyProd = goodUnits * CASE.shiftsPerMonth;
+            const monthlyProfit = monthlyProd * margin;
+            
+            const b_avail = 480 - 80 - 40; 
+            const b_netRun = b_avail - (20 * 2); 
+            const b_gross = b_netRun * 300; 
+            const b_good = b_gross * 0.92; 
+            const b_totalProd = b_good * CASE.shiftsPerMonth;
+            const b_profit = b_totalProd * 0.30;
+            const incrementalProfit = monthlyProfit - b_profit;
+            const roi = cost > 0 ? (incrementalProfit / cost) * 100 : 0;
+            return { oee, profit: monthlyProfit, cost, roi, stats, cart, availPct, perfPct, qualPct, baseProfit: b_profit, totalProd: monthlyProd, baseProd: b_totalProd };
+        };
+
+        // --- BOT AI ---
+        function generateBotStrategy() {
+            // Shuffle upgrades
+            const shuffled = [...UPGRADES].sort(() => 0.5 - Math.random());
+            const cart = [];
+            let currentCost = 0;
+
+            // Pick items until budget is almost full
+            for (let item of shuffled) {
+                if (currentCost + item.cost <= CASE.budget) {
+                    cart.push(item.id);
+                    currentCost += item.cost;
+                }
+            }
+
+            // Calculate realistic results
+            const results = calculateStats(cart);
+            // Simulate playing time (bots are fast, but let's vary it between 2.5 min and 3 min)
+            results.timeTaken = 150 + Math.floor(Math.random() * 30);
+            
+            return results;
+        }
+
+        // --- Logic Below ---
+        let db, auth;
+        let currentRoomCode = null;
+        let bots = [];
+        let hostUid = null;
+
+        function log(msg, type='text-gray-400') {
+            const el = document.getElementById('logs');
+            const line = document.createElement('div');
+            line.className = type;
+            line.innerText = `> ${msg}`;
+            el.appendChild(line);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        async function initAndCreate() {
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+                
+                log("Connecting to Firebase...", "info");
+                const cred = await auth.signInAnonymously();
+                hostUid = cred.user.uid;
+                log(`Authenticated as Host: ${hostUid}`, "success");
+
+                // Create Room
+                const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+                await db.collection('rooms').doc(code).set({
+                    code,
+                    status: 'waiting',
+                    players: [{ uid: hostUid, name: "HOST_MONITOR", isHost: true }],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                currentRoomCode = code;
+                document.getElementById('roomCode').innerText = code;
+                log(`Room Created: ${code}`, "success");
+                
+                // Subscribe to changes
+                db.collection('rooms').doc(code).onSnapshot(doc => {
+                    const data = doc.data();
+                    if(data) {
+                        document.getElementById('botCount').innerText = data.players.length;
+                    }
+                });
+
+            } catch (e) {
+                log(`Error: ${e.message}`, "error");
+                console.error(e);
+            }
+        }
+
+        async function spawnBots(count) {
+            if(!currentRoomCode) return alert("Create room first!");
+            log(`Spawning ${count} bots into the lobby...`, "info");
+
+            const ref = db.collection('rooms').doc(currentRoomCode);
+
+            try {
+                const newBots = [];
+                for(let i=0; i<count; i++) {
+                    newBots.push({
+                        uid: `bot-${Math.random().toString(36).substr(2,9)}`,
+                        name: `Bot_${i+1}_${Math.random().toString(36).substr(2,4).toUpperCase()}`,
+                        isHost: false
+                    });
+                }
+                bots = newBots;
+
+                // Bulk update to put them in the room
+                await db.runTransaction(async (t) => {
+                    const doc = await t.get(ref);
+                    const players = doc.data().players;
+                    const combined = [...players, ...newBots];
+                    t.update(ref, { players: combined });
+                });
+                
+                log(`${count} Bots successfully joined. Awaiting Game Start.`, "success");
+
+            } catch(e) {
+                log(`Bot Spawn Error: ${e.message}`, "error");
+            }
+        }
+
+        async function submitScoreWithRetry(bot, ref) {
+            // 1. Generate Strategy
+            const scoreData = generateBotStrategy();
+            // log(`Bot ${bot.name} generated strategy: $${scoreData.profit.toFixed(0)} Profit (Cost: $${scoreData.cost})`, "text-gray-500");
+
+            const maxRetries = 5;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    await db.runTransaction(async (t) => {
+                        const doc = await t.get(ref);
+                        if (!doc.exists) throw "Room gone";
+                        const data = doc.data();
+                        
+                        // Don't submit if game isn't playing
+                        if (data.status !== 'playing') throw "Game not started";
+
+                        const players = data.players;
+                        
+                        const updatedPlayers = players.map(p => {
+                            if (p.uid === bot.uid) return { ...p, score: scoreData };
+                            return p;
+                        });
+
+                        const allFinished = updatedPlayers.every(p => p.score);
+                        const updatePayload = { players: updatedPlayers };
+                        if (allFinished) updatePayload.status = 'finished';
+
+                        t.update(ref, updatePayload);
+                    });
+                    return; // Success
+                } catch (e) {
+                    if (e === "Game not started") throw e;
+                    if (i === maxRetries - 1) throw e;
+                    // Jitter + Exponential Backoff
+                    const delay = Math.random() * 500 + (i * 200);
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        }
+
+        async function runSimulation() {
+            if(bots.length === 0) return alert("Spawn bots first");
+            
+            // 1. Host Starts Game
+            log(`🏁 HOST STARTED GAME. Timer running...`, "warn");
+            await db.collection('rooms').doc(currentRoomCode).update({
+                status: 'playing',
+                startTime: Date.now(),
+                endTime: Date.now() + (300*1000) // 5 mins
+            });
+
+            log(`🤖 Bots are 'thinking' and formulating strategies...`, "info");
+
+            const ref = db.collection('rooms').doc(currentRoomCode);
+            let successCount = 0;
+            let failCount = 0;
+
+            // 2. Bots play and submit with random delay (Simulating thinking time + network jitter)
+            const promises = bots.map(async (bot) => {
+                // Random delay between 1s and 4s to simulate different play speeds
+                const thinkTime = Math.random() * 3000 + 1000;
+                await new Promise(r => setTimeout(r, thinkTime));
+                
+                return submitScoreWithRetry(bot, ref)
+                    .then(() => {
+                        successCount++;
+                        document.getElementById('opCount').innerText = successCount;
+                        // log(`✅ ${bot.name} submitted strategy.`, "text-green-800");
+                    }).catch((e) => {
+                        failCount++;
+                        console.error(e);
+                        document.getElementById('errCount').innerText = failCount;
+                        log(`❌ ${bot.name} failed: ${e.message || e}`, "error");
+                    });
+            });
+
+            await Promise.all(promises);
+
+            log(`--- SIMULATION COMPLETE ---`, "info");
+            log(`Summary: ${successCount} Success / ${failCount} Failures`, successCount === bots.length ? "success" : "warn");
+        }
+    </script>
+</body>
+</html>
